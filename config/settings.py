@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'stagiaires',
     'users',
     'rest_framework',
+    'projets',
+    'taches',
 ]
 
 MIDDLEWARE = [
