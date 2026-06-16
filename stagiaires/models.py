@@ -56,5 +56,25 @@ class Stagiaire(models.Model):
         default='en_attente'
     )
 
+    def update_absences_count(self):
+        from presences.models import Presence
+        from presences.utils import send_whatsapp_alert
+        count = Presence.objects.filter(
+            stagiaire=self, 
+            statut='absent', 
+            est_justifiee=False
+        ).count()
+        self.absences_nj_count = count
+        self.save()
+        
+        if count == 2:
+            send_whatsapp_alert(self.user.telephone_whatsapp, "Avertissement : 2 absences non justifiées enregistrées")
+        
+        if count >= 3:
+            self.user.is_active = False
+            self.user.save()
+            return True
+        return False
+
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name}"
