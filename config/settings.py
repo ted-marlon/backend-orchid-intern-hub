@@ -24,10 +24,10 @@ load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-&-vjx8mg%h8wmebjrswr6^3oq-g0cotba&8hdt$k#7*+a202t6'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key-replace-this-in-prod')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = []
 
@@ -84,12 +84,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres.qiuzwutpqcykgldidqxe',
-        'PASSWORD': 'wypzop-sarsak-2daDvy',
-        'HOST': 'aws-0-eu-west-1.pooler.supabase.com',
-        'PORT': '6543',
+        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
+        'NAME': os.getenv('DB_NAME', 'postgres'),
+        'USER': os.getenv('DB_USER', ''),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', ''),
+        'PORT': os.getenv('DB_PORT', ''),
     }
 }
 

@@ -10,6 +10,8 @@ class CustomUserAdmin(UserAdmin):
     ordering = ('-created_at',)
 
     # Champs affichés lors de la création/modification
+    readonly_fields = ('created_at', 'last_login')
+
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Informations personnelles', {'fields': ('nom', 'prenom', 'telephone_whatsapp', 'role')}),
