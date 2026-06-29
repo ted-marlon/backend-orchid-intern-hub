@@ -2,14 +2,16 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings 
 
+class Departement(models.Model):
+    nom = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.nom
+
+
 
 class Stagiaire(models.Model):
 
-    STATUT_CHOICES = [
-        ('en_attente', 'En attente'),
-        ('accepte', 'Accepté'),
-        ('refuse', 'Refusé'),
-    ]
 
     RAPPORT_STATUT_CHOICES = [
         ('en_attente', 'En attente'),
@@ -32,11 +34,12 @@ class Stagiaire(models.Model):
         blank=True,
         null=True
     )
-
-    statut = models.CharField(
-        max_length=20,
-        choices=STATUT_CHOICES,
-        default='en_attente'
+    departement = models.ForeignKey(
+        Departement,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stagiaires'
     )
 
     date_debut = models.DateField()

@@ -1,7 +1,19 @@
 # users/serializers.py
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import CustomUser
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """JWT avec email comme identifiant (USERNAME_FIELD)."""
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['role'] = user.role
+        token['email'] = user.email
+        return token
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
