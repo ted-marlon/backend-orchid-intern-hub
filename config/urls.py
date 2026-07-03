@@ -16,9 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from config.views import dashboard_stats
 from rest_framework_simplejwt.views import TokenRefreshView
 from users.views import CustomTokenObtainPairView
-from config.views import dashboard_stats
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -30,5 +30,5 @@ urlpatterns = [
     path('api/', include('taches.urls')),
     path('api/', include('presences.urls')),
     path('api/', include('rapports.urls')),
-    path('api/dashboard-stats/', dashboard_stats, name='dashboard_stats'),
+    path('api/dashboard-stats/', dashboard_stats, name='dashboard_stats'), 
 ]

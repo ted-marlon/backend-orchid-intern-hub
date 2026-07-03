@@ -9,6 +9,7 @@ from .serializers import PresenceSerializer
 from .utils import notify_rh_and_stagiaire, is_moroccan_holiday, generate_pointing_qr, verify_qr_data
 from stagiaires.models import Stagiaire
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from datetime import time
 
 class PresenceViewSet(viewsets.ModelViewSet):
     queryset = Presence.objects.all()
@@ -152,3 +153,87 @@ class PresenceViewSet(viewsets.ModelViewSet):
         presence.save()
         
         return Response({"message": "Justification enregistrée."}, status=status.HTTP_200_OK)
+    
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="dashboard",
+        permission_classes=[]
+    )
+    def dashboard(self, request):
+        """
+        Retourne les statistiques du dashboard ainsi que la liste des présences.
+        """
+
+        today = timezone.localdate()
+
+        presences = (
+            Presence.objects
+            .filter(date=today)
+            .select_related(
+                "stagiaire",
+                "stagiaire__user",
+                "stagiaire__departement"
+            )
+        )
+
+        serializer = PresenceSerializer(presences, many=True)
+
+        # Statistiques
+        presents = presences.filter(statut="present").count()
+
+        absents = presences.filter(statut="absent").count()
+
+        sortis = presences.exclude(
+            heure_sortie__isnull=True
+        ).count()
+
+        entrees = presences.exclude(
+            heure_entree__isnull=True
+        ).count()
+
+        # Heure limite d'arrivée (09:00)
+        heure_limite = time(9, 0)
+
+        retards_queryset = presences.filter(
+            heure_entree__gt=heure_limite
+        )
+
+        retards = retards_queryset.count()
+
+        total_retard = 0
+
+        for presence in retards_queryset:
+            minutes = (
+                presence.heure_entree.hour * 60
+                + presence.heure_entree.minute
+            ) - (9 * 60)
+
+            total_retard += minutes
+
+        retard_moyen = (
+            round(total_retard / retards)
+            if retards > 0
+            else 0
+        )
+
+        total = presences.count()
+
+        taux_presence = (
+            round((presents / total) * 100)
+            if total > 0
+            else 0
+        )
+
+        return Response({
+            "kpis": {
+                "presents": presents,
+                "absents": absents,
+                "entrees": entrees,
+                "sortis": sortis,
+                "retards": retards,
+                "retard_moyen": retard_moyen,
+                "taux_presence": taux_presence,
+            },
+            "presences": serializer.data
+        })
