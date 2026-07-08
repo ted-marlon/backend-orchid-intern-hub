@@ -6,6 +6,9 @@ from datetime import date
 from twilio.rest import Client
 from django.conf import settings
 from django.core.signing import TimestampSigner
+from .models import Alerte
+from datetime import date, timedelta
+from django.utils import timezone
 
 signer = TimestampSigner()
 
@@ -113,3 +116,106 @@ def notify_rh_and_stagiaire(stagiaire, message):
     # Notification RH
     if rh_number:
         send_whatsapp_alert(rh_number, f"[ALERT RH] {message}")
+
+from datetime import time, date
+
+def creer_alerte(titre, description, severite='info', source='Système'):
+    """
+    Fonction utilitaire pour créer une alerte automatiquement
+    """
+    # ⚠️ IMPORT LOCAL - TRÈS IMPORTANT pour éviter le circulaire
+    from .models import Alerte
+    
+    return Alerte.objects.create(
+        titre=titre,
+        description=description,
+        severite=severite,
+        source=source
+    )
+
+def alerter_absence_non_justifiee(stagiaire, date_absence):
+    """
+    Crée une alerte quand un stagiaire a une absence non justifiée
+    """
+    nom_complet = f"{stagiaire.user.prenom} {stagiaire.user.nom}"
+    titre = f"Absence non justifiée - {nom_complet}"
+    description = f"{nom_complet} était absent(e) le {date_absence.strftime('%d/%m/%Y')} sans justification."
+    
+    absences_non_justifiees = stagiaire.presences.filter(
+        statut='absent',
+        est_justifiee=False
+    ).count()
+    
+    if absences_non_justifiees >= 3:
+        severite = 'critique'
+        description += f"\n⚠️ ATTENTION : Ce stagiaire a maintenant {absences_non_justifiees} absences non justifiées !"
+    else:
+        severite = 'avertissement'
+    
+    creer_alerte(titre, description, severite, 'Gestion des présences')
+
+def alerter_retard_pointage(stagiaire, heure_entree, date_pointage):
+    """
+    Crée une alerte quand un stagiaire arrive en retard (après 9h)
+    """
+    heure_limite = time(9, 0)
+    if heure_entree > heure_limite:
+        minutes_retard = (heure_entree.hour * 60 + heure_entree.minute) - (9 * 60)
+        nom_complet = f"{stagiaire.user.prenom} {stagiaire.user.nom}"
+        
+        titre = f"Retard de pointage - {nom_complet}"
+        description = f"{nom_complet} a pointé à {heure_entree.strftime('%H:%M')} le {date_pointage.strftime('%d/%m/%Y')} (retard de {minutes_retard} minutes)."
+        
+        severite = 'avertissement' if minutes_retard > 30 else 'info'
+        creer_alerte(titre, description, severite, 'Pointage QR')
+
+def alerter_rapport_manquant(stagiaire, date_rapport):
+    """
+    Crée une alerte quand un stagiaire n'a pas déposé son rapport journalier
+    """
+    nom_complet = f"{stagiaire.user.prenom} {stagiaire.user.nom}"
+    titre = f"Rapport journalier manquant - {nom_complet}"
+    description = f"{nom_complet} n'a pas déposé son rapport journalier du {date_rapport.strftime('%d/%m/%Y')}."
+    
+    creer_alerte(titre, description, 'avertissement', 'Système de rapports')
+
+def alerter_fin_stage_approchante(stagiaire, jours_restants):
+    """
+    Crée une alerte quand un stagiaire termine bientôt son stage
+    """
+    nom_complet = f"{stagiaire.user.prenom} {stagiaire.user.nom}"
+    date_fin = stagiaire.date_fin
+    
+    titre = f"Fin de stage approchante - {nom_complet}"
+    description = f"{nom_complet} termine son stage dans {jours_restants} jours ({date_fin.strftime('%d/%m/%Y')}). Préparez l'évaluation finale."
+    
+    severite = 'info'
+    if jours_restants <= 2:
+        severite = 'avertissement'
+    
+    creer_alerte(titre, description, severite, 'Planification')
+
+def generer_alertes_rapports_manquants():
+    """
+    Fonction à appeler chaque jour (via cron) pour générer les alertes de rapports manquants
+    """
+    from datetime import date
+    from rapports.models import RapportJournalier
+    from stagiaires.models import Stagiaire
+    
+    today = date.today()
+    
+    stagiaires = Stagiaire.objects.filter(
+    date_debut__lte=today,  # ✅ Le stage a déjà commencé
+    date_fin__gte=today     # ✅ Le stage n'est pas fini
+)
+    
+    for stagiaire in stagiaires:
+        rapport_existe = RapportJournalier.objects.filter(
+            stagiaire=stagiaire,
+            date_rapport=today,
+            depose=True
+        ).exists()
+        
+        if not rapport_existe:
+            alerter_rapport_manquant(stagiaire, today)

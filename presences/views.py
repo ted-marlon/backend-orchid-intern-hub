@@ -10,6 +10,9 @@ from .utils import notify_rh_and_stagiaire, is_moroccan_holiday, generate_pointi
 from stagiaires.models import Stagiaire
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from datetime import time
+from .models import Alerte, Justification
+from .serializers import AlerteSerializer, JustificationSerializer
+from django.utils import timezone
 
 class PresenceViewSet(viewsets.ModelViewSet):
     queryset = Presence.objects.all()
@@ -237,3 +240,111 @@ class PresenceViewSet(viewsets.ModelViewSet):
             },
             "presences": serializer.data
         })
+class AlerteViewSet(viewsets.ModelViewSet):
+    queryset = Alerte.objects.all()
+    serializer_class = AlerteSerializer
+    permission_classes = [IsAuthenticated]
+    
+    @action(detail=True, methods=['post'], url_path='resoudre')
+    def resoudre(self, request, pk=None):
+        alerte = self.get_object()
+        alerte.statut = 'resolue'
+        alerte.date_resolution = timezone.now()
+        alerte.save()
+        return Response({"message": "Alerte marquée comme résolue."})
+    
+    @action(detail=True, methods=['post'], url_path='marquer-lue')
+    def marquer_lue(self, request, pk=None):
+        alerte = self.get_object()
+        if alerte.statut == 'non-lue':
+            alerte.statut = 'lue'
+            alerte.save()
+        return Response({"message": "Alerte marquée comme lue."})
+
+
+class JustificationViewSet(viewsets.ModelViewSet):
+    serializer_class = JustificationSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'stagiaire':
+            return Justification.objects.filter(stagiaire__user=user)
+        return Justification.objects.all()
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role == 'stagiaire':
+            try:
+                stagiaire = user.stagiaire_profile
+            except Stagiaire.DoesNotExist:
+                raise ValidationError("Profil stagiaire introuvable.")
+            serializer.save(stagiaire=stagiaire)
+        else:
+            serializer.save()
+    
+    @action(detail=True, methods=['post'], url_path='accepter', permission_classes=[IsAuthenticated, IsAdminUser])
+    def accepter(self, request, pk=None):
+        justification = self.get_object()
+        commentaire = request.data.get('commentaire_rh', '')
+        
+        justification.statut = 'acceptee'
+        justification.date_traitement = timezone.now()
+        justification.traite_par = request.user
+        justification.commentaire_rh = commentaire
+        justification.save()
+        
+        # Mettre à jour la présence associée si elle existe
+        try:
+            presence = Presence.objects.get(
+                stagiaire=justification.stagiaire,
+                date=justification.date
+            )
+            presence.est_justifiee = True
+            presence.justification = justification.motif
+            presence.save()
+        except Presence.DoesNotExist:
+            pass
+        
+        return Response({"message": "Justification acceptée."})
+    
+    @action(detail=True, methods=['post'], url_path='rejeter', permission_classes=[IsAuthenticated, IsAdminUser])
+    def rejeter(self, request, pk=None):
+        justification = self.get_object()
+        commentaire = request.data.get('commentaire_rh', '')
+        
+        justification.statut = 'rejetee'
+        justification.date_traitement = timezone.now()
+        justification.traite_par = request.user
+        justification.commentaire_rh = commentaire
+        justification.save()
+        
+        return Response({"message": "Justification rejetée."})
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.core.management import call_command
+from io import StringIO
+from users.permissions import IsAdminOrRH
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminOrRH])
+def generer_alertes_manuelles(request):
+    """
+    Endpoint pour déclencher manuellement la génération des alertes
+    Accessible uniquement aux Admin et RH
+    """
+    out = StringIO()
+    try:
+        call_command('check_alertes', stdout=out)
+        return Response({
+            'success': True,
+            'message': 'Alertes générées avec succès',
+            'output': out.getvalue()
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Erreur lors de la génération: {str(e)}'
+        }, status=500)
