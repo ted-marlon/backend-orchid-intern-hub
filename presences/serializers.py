@@ -40,9 +40,9 @@ class JustificationSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'stagiaire', 'nom_stagiaire', 'type', 'date',
             'motif', 'statut', 'date_demande', 'date_traitement',
-            'traite_par', 'commentaire_rh'
+            'traite_par'
         ]
-        read_only_fields = ['date_demande', 'date_traitement', 'traite_par', 'commentaire_rh']
+        read_only_fields = ['date_demande', 'date_traitement', 'traite_par']
     
     def get_nom_stagiaire(self, obj):
         return f"{obj.stagiaire.user.prenom} {obj.stagiaire.user.nom}"

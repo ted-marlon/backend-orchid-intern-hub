@@ -291,7 +291,6 @@ class JustificationViewSet(viewsets.ModelViewSet):
         justification.statut = 'acceptee'
         justification.date_traitement = timezone.now()
         justification.traite_par = request.user
-        justification.commentaire_rh = commentaire
         justification.save()
         
         # Mettre à jour la présence associée si elle existe
@@ -316,7 +315,6 @@ class JustificationViewSet(viewsets.ModelViewSet):
         justification.statut = 'rejetee'
         justification.date_traitement = timezone.now()
         justification.traite_par = request.user
-        justification.commentaire_rh = commentaire
         justification.save()
         
         return Response({"message": "Justification rejetée."})

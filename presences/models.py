@@ -111,7 +111,6 @@ class Justification(models.Model):
         blank=True,
         related_name='justifications_traitees'
     )
-    commentaire_rh = models.TextField(blank=True, null=True)
     
     class Meta:
         ordering = ['-date_demande']
