@@ -35,14 +35,15 @@ class RapportJournalierSerializer(serializers.ModelSerializer):
 class RapportFinalSerializer(serializers.ModelSerializer):
     nom_stagiaire = serializers.SerializerMethodField(read_only=True)
     nom_valide_par = serializers.SerializerMethodField(read_only=True)
-
+    fichier_url = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = RapportFinal
         fields = [
             'id',
             'stagiaire',
             'nom_stagiaire',
-            'fichier_path',
+            'fichier',
+            'fichier_url',
             'date_depot',
             'statut_validation',
             'commentaire_rh',
@@ -57,4 +58,9 @@ class RapportFinalSerializer(serializers.ModelSerializer):
     def get_nom_valide_par(self, obj):
         if obj.valide_par:
             return f"{obj.valide_par.prenom} {obj.valide_par.nom}"
+        return None
+    def get_fichier_url(self, obj):
+        """Retourne l'URL complète du fichier Cloudinary"""
+        if obj.fichier:
+            return obj.fichier.url  # CloudinaryField fournit automatiquement .url
         return None

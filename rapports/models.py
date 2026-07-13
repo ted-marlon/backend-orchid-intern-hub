@@ -3,6 +3,7 @@ from django.conf import settings
 from datetime import date
 from stagiaires.models import Stagiaire
 from presences.utils import send_whatsapp_alert
+from cloudinary.models import CloudinaryField
 
 class RapportJournalier(models.Model):
     """
@@ -100,9 +101,12 @@ class RapportFinal(models.Model):
         on_delete=models.CASCADE,
         related_name='rapport_final'
     )
-    fichier_path = models.FileField(
-        upload_to='rapports_finaux/',
-        help_text="Fichier PDF du rapport final"
+    fichier = CloudinaryField(
+        'fichier', 
+        folder='rapports_finaux/',       # Dossier dans Cloudinary
+        resource_type='raw',             # OBLIGATOIRE pour les PDF
+        blank=True, 
+        null=True
     )
     date_depot = models.DateField(auto_now_add=True)
     statut_validation = models.CharField(
