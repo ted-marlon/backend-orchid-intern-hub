@@ -29,12 +29,28 @@ class PresenceViewSet(viewsets.ModelViewSet):
     def get_daily_qrs(self, request):
         """Récupère les QR codes du jour (Entrée et Sortie)"""
         # Note: En prod, on pourrait limiter cet accès aux admins/RH ou une tablette fixe
+        from .utils import signer
+        from datetime import date
+        
+        today = date.today().isoformat()
+        
+        # Générer les données signées pour entrée et sortie
+        data_entree = f"pointage:entree:{today}"
+        data_sortie = f"pointage:sortie:{today}"
+        
+        signed_entree = signer.sign(data_entree)
+        signed_sortie = signer.sign(data_sortie)
+        
+        # Générer les QR codes images
         qr_entree = generate_pointing_qr('entree')
         qr_sortie = generate_pointing_qr('sortie')
+        
         return Response({
             "entree": qr_entree,
             "sortie": qr_sortie,
-            "date": date.today().isoformat()
+            "entree_data": signed_entree,
+            "sortie_data": signed_sortie,
+            "date": today
         })
 
     @action(detail=False, methods=['post'], url_path='scanner')

@@ -32,6 +32,9 @@ class Presence(models.Model):
         
         super().save(*args, **kwargs)
         
+        # Import local pour éviter l'import circulaire
+        from .utils import alerter_absence_non_justifiee, alerter_retard_pointage, send_whatsapp_alert
+        
         # Alerter sur les absences non justifiées
         if self.statut == 'absent' and not self.est_justifiee:
             # Vérifier si c'est une nouvelle absence ou si elle vient d'être marquée non justifiée
@@ -41,7 +44,6 @@ class Presence(models.Model):
             # Logique existante pour bloquer le compte
             blocked = self.stagiaire.update_absences_count()
             if blocked:
-                from .utils import send_whatsapp_alert
                 msg = f"Compte bloqué — 3 absences non justifiées pour {self.stagiaire.user.nom} {self.stagiaire.user.prenom}"
                 send_whatsapp_alert(self.stagiaire.user.telephone_whatsapp, msg)
         
