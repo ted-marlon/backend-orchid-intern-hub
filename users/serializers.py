@@ -41,6 +41,6 @@ class UserSerializer(serializers.ModelSerializer):
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ('nom', 'prenom', 'telephone_whatsapp', 'role', 'is_active','email')
-        read_only_fields = ('role', 'is_active')
+        fields = ('id','nom', 'prenom', 'telephone_whatsapp', 'role', 'is_active','email')
+        read_only_fields = ('id','role', 'is_active')
         # On n'autorise pas la modification de l'email ou du mot de passe ici pour simplifier

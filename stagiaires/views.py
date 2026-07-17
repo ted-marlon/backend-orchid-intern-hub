@@ -5,9 +5,14 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse
 from django.utils import timezone
+from django.db.models import Count, Q
 from .models import Stagiaire
 from .serializers import StagiaireSerializer, StagiaireUpdateSerializer, UserStagiaireCreateSerializer
 from users.permissions import IsAdminOrRH
+from presences.models import Presence
+from projets.models import Projet
+from taches.models import Tache
+from rapports.models import RapportJournalier
 
 
 class StagiaireViewSet(viewsets.ModelViewSet):
@@ -106,6 +111,62 @@ class StagiaireViewSet(viewsets.ModelViewSet):
             })
         
         return JsonResponse({'stagiaires': stagiaires_list})
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def stagiaire_dashboard_stats(self, request):
+        """
+        Retourne les statistiques du dashboard pour le stagiaire connecté
+        GET /api/stagiaires/stagiaire_dashboard_stats/
+        """
+        user = request.user
+        if not hasattr(user, 'stagiaire_profile'):
+            return Response({"error": "Seuls les stagiaires peuvent accéder à ces statistiques."}, status=status.HTTP_403_FORBIDDEN)
+        
+        stagiaire = user.stagiaire_profile
+        
+        # Statistiques de base
+        projets_count = Projet.objects.filter(stagiaires=stagiaire).count()
+        taches_count = Tache.objects.filter(stagiaire=stagiaire).count()
+        rapports_count = RapportJournalier.objects.filter(stagiaire=stagiaire).count()
+        
+        # Pointages ce mois
+        from datetime import datetime
+        now = timezone.now()
+        current_month = now.month
+        current_year = now.year
+        pointages_count = Presence.objects.filter(
+            stagiaire=stagiaire,
+            date__month=current_month,
+            date__year=current_year
+        ).count()
+        
+        # Activités récentes
+        recent_activities = []
+        recent_taches = Tache.objects.filter(stagiaire=stagiaire).order_by('-date_creation')[:3]
+        for tache in recent_taches:
+            recent_activities.append(f"Tâche: {tache.titre}")
+        
+        recent_rapports = RapportJournalier.objects.filter(stagiaire=stagiaire).order_by('-date_rapport')[:2]
+        for rapport in recent_rapports:
+            recent_activities.append(f"Rapport du {rapport.date_rapport}")
+        
+        # Prochaines échéances
+        deadlines = []
+        upcoming_taches = Tache.objects.filter(
+            stagiaire=stagiaire,
+            date_echeance__gte=timezone.now().date()
+        ).order_by('date_echeance')[:3]
+        for tache in upcoming_taches:
+            deadlines.append(f"{tache.titre} - {tache.date_echeance.strftime('%d/%m/%Y')}")
+        
+        return Response({
+            'projets': projets_count,
+            'taches': taches_count,
+            'rapports': rapports_count,
+            'pointages': pointages_count,
+            'recent_activities': recent_activities,
+            'deadlines': deadlines
+        })
 
 
 

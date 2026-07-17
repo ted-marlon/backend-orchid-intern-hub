@@ -21,19 +21,40 @@ def dashboard_stats(request):
         user__date_joined__gte=current_month
     ).count()
     
-    # 2. ACTIFS AUJOURD'HUI - Pourcentage de stagiaires présents aujourd'hui
-    # Utiliser uniquement la table Presence pour calculer les stagiaires actifs
-    presences_today = Presence.objects.filter(date=today)
-    total_actifs = presences_today.count()
+    # ==============================================================================
+    # 2. ACTIFS AUJOURD'HUI - CORRECTION ICI
+    # ==============================================================================
     
-    presents_today = 0
-    if total_actifs > 0:
-        presents_today = presences_today.filter(statut='present').count()
-        pourcentage_actifs = round((presents_today / total_actifs) * 100)
+    # A. Qui est censé être là aujourd'hui ? (Stage commencé et pas encore fini)
+    stagiaires_censes_etre_la = Stagiaire.objects.filter(
+        date_debut__lte=today,
+        date_fin__gte=today
+    )
+    total_stagiaires_actifs = stagiaires_censes_etre_la.count()
+    
+    # B. Qui est réellement présent aujourd'hui ? 
+    # (On compte les stagiaires distincts ayant un statut 'present' aujourd'hui)
+    presents_today = Presence.objects.filter(
+        date=today, 
+        statut='present'
+    ).values('stagiaire').distinct().count()
+    
+    # C. Calcul du pourcentage
+    if total_stagiaires_actifs > 0:
+        pourcentage_actifs = round((presents_today / total_stagiaires_actifs) * 100)
     else:
-        pourcentage_actifs = 0
+        pourcentage_actifs = 100  # Si personne n'est censé être là, on considère 100%
     
-    message_presence = "Tous présents" if pourcentage_actifs == 100 else f"{total_actifs - presents_today} absent(s)"
+    # D. Message
+    absents_today = total_stagiaires_actifs - presents_today
+    if total_stagiaires_actifs == 0:
+        message_presence = "Aucun stagiaire actif"
+    elif absents_today == 0:
+        message_presence = "Tous présents"
+    else:
+        message_presence = f"{absents_today} absent(s) sur {total_stagiaires_actifs}"
+    
+    # ==============================================================================
     
     # 3. PROJETS EN COURS - Nombre et avancement moyen
     projets_en_cours = Projet.objects.filter(etat='en_cours')
@@ -50,17 +71,16 @@ def dashboard_stats(request):
         depose=True
     ).count()
     
-    # Rapports attendus = nombre de stagiaires actifs
-    rapports_attendus = total_actifs
+    # CORRECTION : Les rapports attendus correspondent aux stagiaires ACTIFS aujourd'hui
+    # (Inutile d'attendre un rapport d'un stagiaire dont le stage est terminé)
+    rapports_attendus = total_stagiaires_actifs
     rapports_manquants = max(0, rapports_attendus - rapports_deposes_today)
     
     # 5. ALERTES NON LUES - Basées sur les absences non justifiées et autres critères
-    # Alertes: stagiaires avec 2+ absences non justifiées
     alertes_critiques = Stagiaire.objects.filter(
         absences_nj_count__gte=2
     ).count()
     
-    # Alertes totales (incluant les critiques)
     alertes_totales = alertes_critiques
     
     stats = {
